@@ -1,0 +1,15 @@
+version: '3.4'
+
+services:
+  nodekit-l1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODEKIT_COMMITMENT_SEQ_ADDR=$SEQ_ADDR
+      - NODEKIT_COMMITMENT_GETH_ADDR=$L1_RPC
+      - NODEKIT_COMMITMENT_CONTRACT_ADDR=$CONTRACT_ADDR
+      - NODEKIT_COMMITMENT_CONTRACT_WALLET=$CONTRACT_WALLET
+      - NODEKIT_COMMITMENT_CHAIN_ID_L1=$CHAIN_ID_L1
+      - NODEKIT_COMMITMENT_CHAIN_ID=$CHAIN_ID
+
