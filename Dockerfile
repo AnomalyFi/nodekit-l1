@@ -7,27 +7,21 @@ ARG VERSION=v0.0.0
 
 RUN apk add --no-cache make git build-base
 
+COPY . /app/nodekit-commit
+
 # Creates an app directory to hold your app’s source code
-WORKDIR /app
+WORKDIR /app/nodekit-commit
  
 # Copies everything from your root directory into /app
-COPY . .
 
 RUN go mod download
 
+RUN go build -o ./bin/nodekit-commit ./main.go
 
-RUN go build -o /nodekitl1
+FROM alpine:3.19
 
-CMD [ “/nodekitl1 ]
-
-#ARG TARGETOS TARGETARCH
-
-#RUN make op-geth-proxy VERSION="$VERSION" GOOS=$TARGETOS GOARCH=$TARGETARCH
-
-# FROM alpine:3.16
-
-# COPY --from=builder /app/op-geth-proxy/bin/op-geth-proxy /usr/local/bin
+COPY --from=builder /app/nodekit-commit/bin/nodekit-commit /usr/local/bin
 
 
+CMD ["nodekit-commit"]
 
-# CMD ["op-geth-proxy"]
