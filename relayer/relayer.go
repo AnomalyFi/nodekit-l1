@@ -30,7 +30,6 @@ import (
 	"context"
 	"encoding/binary"
 	"log"
-	"time"
 
 	"github.com/AnomalyFi/hypersdk/consts"
 
@@ -51,8 +50,9 @@ type BlockWarp struct {
 type Exe struct {
 	BlockCommitHashes map[uint64]*BlockWarp // this may be unnecessary.
 	PHeight           uint64
+	Height            uint64
 	NodeId            ids.NodeID
-	NextProposers     *[]ids.NodeID
+	NextProposers     map[uint64]*[]ids.NodeID
 }
 
 func PackValidatorsData(initBytes []byte, PublicKey *bls.PublicKey, weight uint64) []byte {
@@ -73,20 +73,7 @@ func GetCanonicalValidatorSet(ctx context.Context, pcli pvm.Client, subnetIDS st
 	return validators, nil
 }
 
-func (e *Exe) UpdateBlockHeight(pCli pvm.Client) {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		<-ticker.C // wait for 1 sec to pass.
-		pHeight, err := pCli.GetHeight(context.Background())
-		if err == nil {
-			e.PHeight = pHeight // update if we succesfully fetched pHeight
-		}
-	}
-}
-
-func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JSONRPCClient, id ids.ID, subnetID string, pHeight uint64, height uint64) (*warp.Message, uint64 /*weight*/, uint64 /*signed weight*/, error) {
+func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JSONRPCClient, id ids.ID, subnetID string, pHeight uint64, height uint64) error {
 	var warpMessage *warp.Message
 	var subnetWt, sigWt uint64
 	for ctx.Err() == nil {
@@ -100,7 +87,8 @@ func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JS
 	}
 	validators, err := GetCanonicalValidatorSet(ctx, pcli, subnetID, pHeight)
 	if err != nil {
-		return nil, 0, 0, err
+		log.Println(err)
+		return err
 	}
 
 	validatorDataBytes := make([]byte, len(validators)*(publicKeyBytes+consts.Uint64Len))
@@ -109,10 +97,11 @@ func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JS
 		validatorDataBytes = append(validatorDataBytes, nVdrDataBytes...)
 	}
 	// store all the gathered values & run a process to clear & prove them
-	log.Printf("subnet weight: %v, sig weight: %d \nwarp message: %08b", subnetWt, sigWt, warpMessage)
+	log.Printf("blockHeight: %d, subnet weight: %d, sig weight: %d \n", height, subnetWt, sigWt)
 	e.BlockCommitHashes[height] = &BlockWarp{PackedValidatorBytes: validatorDataBytes, WarpMsg: warpMessage, PHeight: pHeight, SubnetWeight: subnetWt}
-	//@todo we are left with execute
-	return warpMessage, subnetWt, sigWt, nil
+	//@todo send to novanet instance
+	// submit to L1
+	return nil
 }
 
 func (e *Exe) Realyer(scli *rpc.WebSocketClient, rcli *rpc.JSONRPCClient, pcli pvm.Client, subnetID string) error {
@@ -122,16 +111,16 @@ func (e *Exe) Realyer(scli *rpc.WebSocketClient, rcli *rpc.JSONRPCClient, pcli p
 		return err
 	}
 	ctx := context.Background()
-	log.Println("listening to block commit hash")
+	log.Println("listening to block commit hash...")
 	for ctx.Err() == nil {
-		height, pHeight, hash, id, err := scli.ListenBlockCommitHash(ctx)
+		height, pHeight, _, id, err := scli.ListenBlockCommitHash(ctx)
 		if err != nil {
 			return err
 		}
-		log.Printf("Received Block Commit Hash of block height: %d, hash: %s", height, hash)
+		log.Printf("Received Block Commit Hash of block height: %d", height)
 		// decentralising orchestrator.
-		if e.IsProposer() {
-			log.Printf("Is a proposer")
+		if e.IsProposer(height, rcli) {
+			log.Printf("fetching signatures and executing for block height: %d", height)
 			go e.FetchAndExecute(ctx, pcli, rcli, id, subnetID, pHeight, height)
 		}
 	}
