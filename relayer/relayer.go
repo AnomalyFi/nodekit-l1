@@ -29,7 +29,7 @@ package relayer
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/AnomalyFi/hypersdk/consts"
@@ -49,10 +49,10 @@ type BlockWarp struct {
 }
 
 type Exe struct {
-	BlockCommitHashes map[uint64]*BlockWarp // this seems not necessary to store, as we are going to prove one block at a time.
+	BlockCommitHashes map[uint64]*BlockWarp // this may be unnecessary.
 	PHeight           uint64
 	NodeId            ids.NodeID
-	NextProposers     []ids.NodeID
+	NextProposers     *[]ids.NodeID
 }
 
 func PackValidatorsData(initBytes []byte, PublicKey *bls.PublicKey, weight uint64) []byte {
@@ -109,7 +109,7 @@ func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JS
 		validatorDataBytes = append(validatorDataBytes, nVdrDataBytes...)
 	}
 	// store all the gathered values & run a process to clear & prove them
-	fmt.Printf("subnet weight: %v, sig weight: %d \nwarp message: %08b", subnetWt, sigWt, warpMessage)
+	log.Printf("subnet weight: %v, sig weight: %d \nwarp message: %08b", subnetWt, sigWt, warpMessage)
 	e.BlockCommitHashes[height] = &BlockWarp{PackedValidatorBytes: validatorDataBytes, WarpMsg: warpMessage, PHeight: pHeight, SubnetWeight: subnetWt}
 	//@todo we are left with execute
 	return warpMessage, subnetWt, sigWt, nil
@@ -117,22 +117,21 @@ func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JS
 
 func (e *Exe) Realyer(scli *rpc.WebSocketClient, rcli *rpc.JSONRPCClient, pcli pvm.Client, subnetID string) error {
 
-	err := scli.RegisterBlockCommitHash() // instead we can also listen to blocks
+	err := scli.RegisterBlockCommitHash()
 	if err != nil {
 		return err
 	}
-	go e.UpdateBlockHeight(pcli) // async, want full func to run, lol
 	ctx := context.Background()
+	log.Println("listening to block commit hash")
 	for ctx.Err() == nil {
-		// @todo add debug logs
 		height, pHeight, hash, id, err := scli.ListenBlockCommitHash(ctx)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Received Block Commit Hash of block height: %d, hash: %s", height, hash)
-		// @todo make decentralisation part here -> need to submit x blocks at time y, when z is satisfied.
-		// for every 10 sec, lets run a func to know when we are going to be the next windower. -> do this in main func -> async
+		log.Printf("Received Block Commit Hash of block height: %d, hash: %s", height, hash)
+		// decentralising orchestrator.
 		if e.IsProposer() {
+			log.Printf("Is a proposer")
 			go e.FetchAndExecute(ctx, pcli, rcli, id, subnetID, pHeight, height)
 		}
 	}

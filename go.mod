@@ -3,7 +3,7 @@ module github.com/AnomalyFi/nodekit-l1
 go 1.20
 
 require (
-	github.com/AnomalyFi/hypersdk v0.9.2-0.20240210180535-f172b8f15615
+	github.com/AnomalyFi/hypersdk v0.9.2-0.20240211133705-129f73779b7c
 	github.com/AnomalyFi/nodekit-seq v0.8.22
 	github.com/ava-labs/avalanchego v1.10.10
 	github.com/ethereum/go-ethereum v1.12.0
