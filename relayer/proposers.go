@@ -34,7 +34,7 @@ func (e *Exe) UpdateBlockHeight(rcli *rpc.JSONRPCClient) {
 	}
 }
 func (e *Exe) UpdateProposers(rcli *rpc.JSONRPCClient) {
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 	ctx := context.Background()
 	for {
