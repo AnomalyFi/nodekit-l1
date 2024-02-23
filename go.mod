@@ -88,6 +88,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// replace github.com/AnomalyFi/hypersdk => /home/manojkgorle/nodekit/hypersdk
+replace github.com/AnomalyFi/hypersdk => /home/manojkgorle/nodekit/nodekit-hypersdk
 
 //replace github.com/AnomalyFi/nodekit-seq => /home/noah/code/nodekit-seq

@@ -38,7 +38,7 @@ func (e *Exe) UpdateProposers(rcli *rpc.JSONRPCClient) {
 	defer ticker.Stop()
 	ctx := context.Background()
 	for {
-		<-ticker.C // wait for 9 secs to pass.
+		<-ticker.C // wait for 1 secs to pass.
 		//@todo rules for block height & verification
 		height := e.Height - e.Height%12
 		pHeight := e.PHeight - e.PHeight%12
@@ -65,6 +65,7 @@ func (e *Exe) IsProposer(height uint64, rcli *rpc.JSONRPCClient) bool { // delay
 }
 
 func (e *Exe) ProposerUpdate(modHeight uint64, rcli *rpc.JSONRPCClient) {
+	//@todo update P-height
 	pHeight := e.PHeight - e.PHeight%12
 	proposrs, err := rcli.GetOrchestrator(context.Background(), pHeight, modHeight)
 	if err == nil {

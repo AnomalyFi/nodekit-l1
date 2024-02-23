@@ -17,7 +17,6 @@ package relayer
 //		Every client subscribes to L1_relayer for settlement confirmations.
 //		client can also run their own L1_relayer or submit proof individually to their L1_contract
 //
-//
 //		Do not Over Engineer. Engineer as required. Optimize performance for god-level.
 //
 // 		every SEQ block has an L1BlockHead attatched.-> it is only for tracking L1. -> this should not have any collusion for our relayer(any)
@@ -36,6 +35,7 @@ import (
 	"github.com/AnomalyFi/hypersdk/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 	pvm "github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -43,12 +43,13 @@ import (
 type BlockWarp struct {
 	PackedValidatorBytes []byte
 	WarpMsg              *warp.Message
+	BitSet               []byte
 	PHeight              uint64
 	SubnetWeight         uint64
 }
 
 type Exe struct {
-	BlockCommitHashes map[uint64]*BlockWarp // this may be unnecessary.
+	BlockCommitHashes map[uint64]*BlockWarp // this may be unnecessary -> no, necessary if a zk verify fails
 	PHeight           uint64
 	Height            uint64
 	NodeId            ids.NodeID
@@ -73,18 +74,34 @@ func GetCanonicalValidatorSet(ctx context.Context, pcli pvm.Client, subnetIDS st
 	return validators, nil
 }
 
+func filterValidators(bitBytes []byte, validators []*warp.Validator) ([]*warp.Validator, error) {
+	bitSet := set.BitsFromBytes(bitBytes)
+	filteredVdrs := make([]*warp.Validator, 0, len(validators))
+	for i, vdr := range validators {
+		if !bitSet.Contains(i) {
+			continue
+		}
+
+		filteredVdrs = append(filteredVdrs, vdr)
+	}
+	return filteredVdrs, nil
+}
+
 func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JSONRPCClient, id ids.ID, subnetID string, pHeight uint64, height uint64) error {
 	var warpMessage *warp.Message
 	var subnetWt, sigWt uint64
+	var bitSet []byte
 	for ctx.Err() == nil {
-		warpMsg, subnetWeight, sigWeight, err := rcli.GenerateAggregateWarpSignature(ctx, id)
+		warpMsg, subnetWeight, sigWeight, bSet, err := rcli.GenerateAggregateWarpSignature(ctx, id)
 		if float64(sigWeight) >= float64(subnetWeight)*signature_threshold && err == nil {
 			warpMessage = warpMsg
 			subnetWt = subnetWeight
 			sigWt = sigWeight
+			bitSet = bSet
 			break
 		}
 	}
+
 	validators, err := GetCanonicalValidatorSet(ctx, pcli, subnetID, pHeight)
 	if err != nil {
 		log.Println(err)
@@ -94,12 +111,20 @@ func (e *Exe) FetchAndExecute(ctx context.Context, pcli pvm.Client, rcli *rpc.JS
 	validatorDataBytes := make([]byte, len(validators)*(publicKeyBytes+consts.Uint64Len))
 	for _, validator := range validators {
 		nVdrDataBytes := PackValidatorsData(validatorDataBytes, validator.PublicKey, validator.Weight)
-		validatorDataBytes = append(validatorDataBytes, nVdrDataBytes...)
+		validatorDataBytes = nVdrDataBytes
 	}
 	// store all the gathered values & run a process to clear & prove them
 	log.Printf("blockHeight: %d, subnet weight: %d, sig weight: %d \n", height, subnetWt, sigWt)
-	e.BlockCommitHashes[height] = &BlockWarp{PackedValidatorBytes: validatorDataBytes, WarpMsg: warpMessage, PHeight: pHeight, SubnetWeight: subnetWt}
-	//@todo send to novanet instance
+	e.BlockCommitHashes[height] = &BlockWarp{PackedValidatorBytes: validatorDataBytes, WarpMsg: warpMessage, BitSet: bitSet, PHeight: pHeight, SubnetWeight: subnetWt}
+
+	//@todo process for submission
+	// case - 1: pass bitset, packedValidatorBytes, message + subnetWeight
+	// case - 2: pass bitset, packedValidatorBytes, bitSortedPackedValidatorBytes + subnetWeight
+	filterValidators(bitSet, validators)
+	// BLSAggregateSig: gives success is all signatures are valid. So, let relayer validated signatures here first & check the weight.
+	// if sig comes invalid, remove the signature from aggSignature & create a new aggSig, get WEight & then pass to novanet
+	// if weight is not as sufficient, ask network to sign the block again
+	// send to novanet prover
 	// submit to L1
 	return nil
 }
