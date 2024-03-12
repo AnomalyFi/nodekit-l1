@@ -48,10 +48,22 @@ func main() {
 	}
 
 	log.Println("Starting commitment manager")
+	log.Printf("sequencerAddr: %s\n", *sequencerAddr)
+	log.Printf("gethAddr: %s\n", *gethAddr)
+	log.Printf("contractAddr: %s\n", *contractAddr)
+	log.Printf("contractWallet: %s\n", *contractWallet)
+	log.Printf("vm_id: %d\n", *vm_id)
+	log.Printf("chain_id: %s\n", *chain_id)
 
 	conn, err := ethclient.Dial(*gethAddr)
+	if err != nil {
+		panic(fmt.Errorf("unable to connect to eth l1: %v", err))
+	}
 
 	sequencerContractTest, err := sequencer.NewSequencer(ethcommon.HexToAddress(*contractAddr), conn)
+	if err != nil {
+		panic(fmt.Errorf("sequencer contract error: %v", err))
+	}
 
 	// function call on `instance`. Retrieves pending name
 	maxBlocks, err := sequencerContractTest.MAXBLOCKS(&ethbind.CallOpts{Pending: true})
