@@ -16,7 +16,7 @@ WORKDIR /app/nodekit-commit
 
 RUN go mod download
 
-RUN go build -o ./bin/nodekit-commit ./main.go
+RUN CGO_CFLAGS="-O -D__BLST_PORTABLE__" CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__" go build -o ./bin/nodekit-commit ./main.go
 
 FROM alpine:3.19
 
