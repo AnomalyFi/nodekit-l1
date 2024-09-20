@@ -1,6 +1,6 @@
 #FROM --platform=$BUILDPLATFORM golang:1.20.12-bullseye as builder
 #FROM --platform=$BUILDPLATFORM golang:1.19.9-alpine3.16 as builder
-FROM --platform=$BUILDPLATFORM golang:1.20.12-alpine3.19 as builder
+FROM --platform=$BUILDPLATFORM golang:1.21.12-alpine3.19 as builder
 
 
 ARG VERSION=v0.0.0

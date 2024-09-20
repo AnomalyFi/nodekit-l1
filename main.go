@@ -190,7 +190,7 @@ func SyncRequest(
 	for i := 0; i < max; i++ {
 		//TODO Need to modify the BlockRoot so it is a commitment instead matching OP Stack. The block root itself should be a commitment to match with NMT Root
 
-		id, _ := types.DecodeCB58(res.Blocks[i].BlockId)
+		id, _ := types.DecodeCB58(res.Blocks[i].BlockID)
 
 		blocks = append(blocks, sequencer.SequencerWarpBlock{
 			Height:     res.Blocks[i].Height,
